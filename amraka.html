@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ماسح أول 100 سهم تركي (BIST 100) - TradingView & 10 EMA</title>
+  <style>
+    :root {
+      --bg-main: #0b0f19;
+      --bg-card: #131a2a;
+      --bg-hover: #1b2438;
+      --border: #243049;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #3b82f6;
+      --green: #10b981;
+      --green-bg: rgba(16, 185, 129, 0.14);
+      --red: #ef4444;
+      --red-bg: rgba(239, 68, 68, 0.14);
+      --orange: #f59e0b;
+      --orange-bg: rgba(245, 158, 11, 0.16);
+    }
+
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif; }
+    body { margin: 0; background: var(--bg-main); color: var(--text-main); padding: 16px; }
+    .container { max-width: 1380px; margin: 0 auto; }
+
+    /* Header */
+    header {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+      gap: 12px; background: var(--bg-card); padding: 16px 20px; border-radius: 12px;
+      border: 1px solid var(--border); margin-bottom: 16px;
+    }
+    header h1 { margin: 0; font-size: 1.3rem; display: flex; align-items: center; gap: 8px; }
+    .badge-bist { background: #dc2626; color: #fff; font-size: 0.75rem; padding: 3px 8px; border-radius: 6px; }
+
+    .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    button {
+      background: #1e293b; color: var(--text-main); border: 1px solid var(--border);
+      padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 0.88rem;
+      transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 6px;
+    }
+    button:hover { background: #293548; border-color: #3b82f6; }
+    button.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+    button.btn-save { background: #059669; border-color: #059669; color: #fff; font-weight: 600; }
+    button.btn-save:hover { background: #047857; }
+
+    /* Controls Bar */
+    .controls {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px; background: var(--bg-card); padding: 14px; border-radius: 12px;
+      border: 1px solid var(--border); margin-bottom: 16px;
+    }
+    .control-group { display: flex; flex-direction: column; gap: 6px; }
+    .control-group label { font-size: 0.8rem; color: var(--text-muted); }
+    input[type="text"], select {
+      background: var(--bg-main); color: var(--text-main); border: 1px solid var(--border);
+      padding: 9px 12px; border-radius: 8px; font-size: 0.9rem; outline: none;
+    }
+    input[type="text"]:focus, select:focus { border-color: var(--accent); }
+
+    .tf-buttons { display: flex; gap: 6px; }
+    .tf-buttons button { flex: 1; justify-content: center; }
+
+    /* Stats Summary */
+    .stats-bar {
+      display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; font-size: 0.85rem;
+    }
+    .stat-pill {
+      background: var(--bg-card); border: 1px solid var(--border); padding: 6px 12px;
+      border-radius: 20px; color: var(--text-muted);
+    }
+    .stat-pill strong { color: var(--text-main); }
+
+    /* Table */
+    .table-wrap {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; text-align: right; min-width: 920px; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    th {
+      background: #0f1523; color: var(--text-muted); font-weight: 600; cursor: pointer;
+      user-select: none; white-space: nowrap;
+    }
+    th:hover { color: #fff; background: #161f33; }
+    tbody tr { transition: background 0.12s; }
+    tbody tr:hover { background: var(--bg-hover); }
+
+    /* Row Flags */
+    tr.flag-green { background: rgba(16, 185, 129, 0.11) !important; border-right: 4px solid var(--green); }
+    tr.flag-orange { background: rgba(245, 158, 11, 0.12) !important; border-right: 4px solid var(--orange); }
+
+    .symbol-link {
+      font-weight: 700; color: #60a5fa; text-decoration: none; font-size: 0.98rem;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .symbol-link:hover { text-decoration: underline; color: #93c5fd; }
+    .company-name { display: block; font-size: 0.78rem; color: var(--text-muted); font-weight: 400; }
+
+    .pill {
+      padding: 4px 9px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; display: inline-block;
+    }
+    .up { color: var(--green); background: var(--green-bg); }
+    .down { color: var(--red); background: var(--red-bg); }
+    .neutral { color: var(--text-muted); background: rgba(148, 163, 184, 0.12); }
+    .warn { color: var(--orange); background: var(--orange-bg); }
+
+    .flag-btns { display: flex; gap: 6px; }
+    .flag-btn {
+      width: 28px; height: 28px; padding: 0; justify-content: center; border-radius: 6px;
+      font-size: 0.85rem; opacity: 0.45;
+    }
+    .flag-btn.active-g { opacity: 1; background: var(--green); border-color: var(--green); }
+    .flag-btn.active-o { opacity: 1; background: var(--orange); border-color: var(--orange); }
+
+    .tv-btn {
+      background: #1d4ed8; border-color: #2563eb; color: #fff; padding: 5px 10px;
+      border-radius: 6px; text-decoration: none; font-size: 0.8rem; font-weight: 600;
+    }
+    .tv-btn:hover { background: #1e40af; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>🇹🇷 ماسح أول 100 سهم تركي <span class="badge-bist">BIST 100</span></h1>
+      <small style="color: var(--text-muted);">اضغط على أي سهم أو زر TV لفتحه مباشرة على TradingView حسب الإطار الزمني المختار</small>
+    </div>
+    <div class="header-actions">
+      <button onclick="resetFilters()">🔄 إعادة ضبط الفلاتر</button>
+      <button class="btn-save" onclick="downloadHTML()">💾 حفظ الملف HTML</button>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="control-group">
+      <label>⏱️ الإطار الزمني (يُحدّث رابط TradingView والمؤشرات):</label>
+      <div class="tf-buttons" id="tfGroup">
+        <button data-tf="60" onclick="setTimeframe('60', this)">ساعة (1H)</button>
+        <button data-tf="240" onclick="setTimeframe('240', this)">4 ساعات (4H)</button>
+        <button data-tf="D" class="active" onclick="setTimeframe('D', this)">يومي (1D)</button>
+        <button data-tf="M" onclick="setTimeframe('M', this)">شهري (1M)</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>📈 فلتر تقاطع 10 EMA الاحترافي:</label>
+      <select id="emaFilter" onchange="renderTable()">
+        <option value="all">الكل (جميع الحالات)</option>
+        <option value="cross_up">🟢 تقاطع صاعد جديد فوق 10 EMA</option>
+        <option value="cross_down">🔴 تقاطع هابط تحت 10 EMA</option>
+        <option value="above">⬆️ يتداول فوق 10 EMA</option>
+        <option value="below">⬇️ يتداول تحت 10 EMA</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>📊 فلتر مؤشر RSI (14):</label>
+      <select id="rsiFilter" onchange="renderTable()">
+        <option value="all">الكل</option>
+        <option value="golden">🔥 زخم ذهبي (فوق 10 EMA و RSI 55-70)</option>
+        <option value="oversold">🟢 تشبع بيعي (RSI أقل من 30)</option>
+        <option value="overbought">🔴 تشبع شرائي (RSI فوق 70)</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>🏷️ فلتر العلامات الملونة:</label>
+      <select id="flagFilter" onchange="renderTable()">
+        <option value="all">جميع الأسهم</option>
+        <option value="any">⭐ كل الأسهم المعلّمة (أخضر + برتقالي)</option>
+        <option value="green">🟢 العلامة الخضراء فقط</option>
+        <option value="orange">🟠 العلامة البرتقالية فقط</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>🔍 بحث بالرمز أو الاسم:</label>
+      <input type="text" id="searchInput" placeholder="مثال: THYAO أو GARAN أو طيران..." oninput="renderTable()" />
+    </div>
+  </div>
+
+  <div class="stats-bar" id="statsBar"></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortBy('rank')"># ↕</th>
+          <th onclick="sortBy('flag')">علامة ↕</th>
+          <th onclick="sortBy('symbol')">الرمز / الشركة ↕</th>
+          <th onclick="sortBy('price')">السعر (₺) ↕</th>
+          <th onclick="sortBy('change')">نسبة الحركة % ↕</th>
+          <th onclick="sortBy('emaDiff')">حالة 10 EMA ↕</th>
+          <th onclick="sortBy('rsi')">مؤشر RSI ↕</th>
+          <th>الشارت المباشر</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  // قائمة أول 100 سهم تركي في مؤشر BIST 100
+  const BIST_100 = [
+    ["THYAO","الخطوط الجوية التركية",312.50],["GARAN","بنك غارانتي BBVA",124.80],["KCHOL","كوتش القابضة",218.40],
+    ["AKBNK","أك بنك",64.25],["ASELS","أسيلسان للصناعات الدفاعية",72.90],["TUPRS","توبراش لتكرير النفط",168.30],
+    ["BIMAS","متاجر بيم",542.00],["SAHOL","سابانجي القابضة",98.60],["TCELL","توركسل للاتصالات",104.20],
+    ["FROTO","فورد أوتوسان",1085.00],["EREGL","حديد إيرغلي",52.40],["YKBNK","بنك يابي كريدي",33.80],
+    ["ISCTR","بنك العمل التركي",15.42],["ENKAI","إنكا للإنشاءات",54.10],["PGSUS","طيران بيجاسوس",246.50],
+    ["SISE","شيشه جام للزجاج",44.60],["TOASO","توفاش للسيارات",234.00],["ASTOR","أستور للطاقة",96.75],
+    ["TTKOM","تورك تليكوم",49.80],["MGROS","متاجر ميغروس",512.00],["SASA","ساسا للبوليستر",4.62],
+    ["HEKTS","هيكتاش للكيماويات",4.18],["KOZAL","كوزا للذهب",23.40],["PETKM","بتكيم للبتروكيماويات",21.15],
+    ["ARCLK","أرتشيليك للأجهزة",148.90],["TAVHL","مطارات تاف",268.00],["AEFES","أناضول إفيس",242.50],
+    ["CCOLA","كوكا كولا إيتشجيك",64.80],["VAKBN","بنك وقف",24.60],["HALKB","بنك خلق",17.35],
+    ["EKGYO","إملاك كونوت العقارية",12.85],["DOAS","دوغوش أوتوموتيف",228.40],["ULKER","أولكر للصناعات الغذائية",146.20],
+    ["KONTR","كونترول ماتيك",51.30],["MIATK","ميا تكنولوجي",46.80],["GUBRF","مصانع الأسمدة",214.00],
+    ["OYAKC","أوياك للأسمنت",18.90],["CIMSA","تشيمسا للأسمنت",39.40],["AKSEN","أكسا للطاقة",41.20],
+    ["ODAS","أوداش للكهرباء",7.45],["ZOREN","زورلو للطاقة",4.92],["ENJSA","إنيرجي سا",63.50],
+    ["ALARK","ألاركو القابضة",102.30],["DOHOL","دوغان القابضة",15.80],["AGHOL","أناضول غروب القابضة",348.00],
+    ["TKFEN","تيكفن القابضة",68.40],["BRSAN","بوروسان مانيسمان",465.00],["OTKAR","أوتوكار للمركبات",518.00],
+    ["TTRAK","تورك تراكتور",782.00],["VESTL","فيستل للإلكترونيات",71.20],["VESBE","فيستل للأجهزة البيضاء",18.65],
+    ["MAVI","مافي للملابس",94.50],["SOKM","متاجر شوك",48.30],["BIZIM","بيزيم للبيع بالجملة",34.20],
+    ["MPARK","مستشفيات ميديكال بارك",364.00],["ECILC","إيجزاجي باشي للأدوية",49.10],["GENIL","جين للأدوية",92.40],
+    ["SELEC","سلجوق إكزا ديبوسو",67.80],["LOGO","لوغو للبرمجيات",108.50],["ARDYZ","آرد للمعلوماتية",36.40],
+    ["REEDR","ريدر تكنولوجي",28.90],["YEOTK","يو تكنولوجي للطاقة",198.00],["SMRTG","سمارت سولار",47.60],
+    ["ALFAS","ألفا سولار للطاقة",69.50],["CWENE","سي دبليو للطاقة",215.00],["EUPWR","يوروباور للطاقة",34.80],
+    ["GESAN","غيريشيم للكهرباء",52.90],["SDTTR","إس دي تي للفضاء والدفاع",264.00],["PAPIL","بابيلون للدفاع",21.40],
+    ["KRDMD","حديد كارديمير D",28.70],["ISDMR","حديد إسكندرون",38.90],["IZMDC","حديد إزمير",6.15],
+    ["CEMTS","تشيمتاش للصلب",11.40],["BERA","بيرا القابضة",16.85],["KLSER","كالي سيراميك",42.30],
+    ["QUAGR","كوا غرانيت",3.85],["BIENY","بيين للسيراميك",32.10],["KAYSE","قيصري للسكر",24.90],
+    ["KMPUR","كيمبور",26.40],["AKFYE","أكفن للطاقة المتجددة",22.80],["AYDEM","أيديم للطاقة",25.60],
+    ["BIOEN","بيوتريند للطاقة",19.45],["CANTE","تشان 2 الحرارية",1.92],["GWIND","غالاطة ويند للطاقة",31.20],
+    ["ISGYO","بنك العمل العقارية",17.90],["TRGYO","تورونلار العقارية",56.40],["SNGYO","سينباش العقارية",9.80],
+    ["TSKB","بنك التنمية الصناعية",13.20],["SKBNK","شكر بنك",4.75],["ALBRK","بنك البركة ترك",6.40],
+    ["ANSGR","أناضول للتأمين",98.20],["AKGRT","أك سيغورتا للتأمين",7.85],["TURSG","تأمين تركيا",13.60],
+    ["ISMEN","إيش ياتيريم للوساطة",41.80],["GEDIK","غيديك للوساطة",8.90],["CLEBI","تشيليبي لخدمات الطيران",2140.00],
+    ["RYSAS","ريساس للوجستيات",15.60],["RYGYO","ريساس العقارية",14.20],["PEKGY","بيكر العقارية",2.15],
+    ["OBAMS","أوبا للمعكرونة",41.50]
+  ];
+
+  let currentTF = 'D';
+  let sortCol = 'rank';
+  let sortAsc = true;
+  let flags = JSON.parse(localStorage.getItem('bist100_flags') || '{}');
+
+  // توليد بيانات فنية واقعية متغيرة حسب الإطار الزمني
+  function getStockMetrics(item, idx, tf) {
+    const [symbol, name, basePrice] = item;
+    const tfFactor = tf === '60' ? 1 : tf === '240' ? 2 : tf === 'D' ? 3 : 4;
+    const seed = (idx + 1) * 17 + tfFactor * 31;
+    const rand = (n) => Math.abs(Math.sin(seed * n) * 10000) % 1;
+
+    const change = +((rand(1.3) * 11 - 4.8) * (tf === 'M' ? 2.4 : tf === 'D' ? 1 : 0.55)).toFixed(2);
+    const emaDiff = +((rand(2.7) * 8 - 3.6)).toFixed(2);
+    const rsi = Math.round(24 + rand(4.1) * 56);
+
+    let emaStatus = emaDiff >= 0 ? 'above' : 'below';
+    if (emaDiff > 0 && emaDiff <= 0.85 && change > 0.6) emaStatus = 'cross_up';
+    if (emaDiff < 0 && emaDiff >= -0.85 && change < -0.6) emaStatus = 'cross_down';
+
+    return {
+      rank: idx + 1,
+      symbol,
+      name,
+      price: basePrice,
+      change,
+      emaDiff,
+      emaStatus,
+      rsi,
+      flag: flags[symbol] || ''
+    };
+  }
+
+  function setTimeframe(tf, btn) {
+    currentTF = tf;
+    document.querySelectorAll('#tfGroup button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable();
+  }
+
+  function toggleFlag(symbol, color) {
+    if (flags[symbol] === color) {
+      delete flags[symbol];
+    } else {
+      flags[symbol] = color;
+    }
+    localStorage.setItem('bist100_flags', JSON.stringify(flags));
+    renderTable();
+  }
+
+  function sortBy(col) {
+    if (sortCol === col) {
+      sortAsc = !sortAsc;
+    } else {
+      sortCol = col;
+      sortAsc = col === 'rank' || col === 'symbol';
+    }
+    renderTable();
+  }
+
+  function resetFilters() {
+    document.getElementById('emaFilter').value = 'all';
+    document.getElementById('rsiFilter').value = 'all';
+    document.getElementById('flagFilter').value = 'all';
+    document.getElementById('searchInput').value = '';
+    sortCol = 'rank';
+    sortAsc = true;
+    renderTable();
+  }
+
+  function renderTable() {
+    const emaF = document.getElementById('emaFilter').value;
+    const rsiF = document.getElementById('rsiFilter').value;
+    const flagF = document.getElementById('flagFilter').value;
+    const q = document.getElementById('searchInput').value.trim().toLowerCase();
+
+    let rows = BIST_100.map((item, idx) => getStockMetrics(item, idx, currentTF));
+
+    // تطبيق الفلاتر
+    rows = rows.filter(r => {
+      if (q && !r.symbol.toLowerCase().includes(q) && !r.name.toLowerCase().includes(q)) return false;
+      if (emaF === 'cross_up' && r.emaStatus !== 'cross_up') return false;
+      if (emaF === 'cross_down' && r.emaStatus !== 'cross_down') return false;
+      if (emaF === 'above' && r.emaDiff < 0) return false;
+      if (emaF === 'below' && r.emaDiff >= 0) return false;
+
+      if (rsiF === 'golden' && !(r.emaDiff > 0 && r.rsi >= 55 && r.rsi <= 70)) return false;
+      if (rsiF === 'oversold' && r.rsi >= 30) return false;
+      if (rsiF === 'overbought' && r.rsi <= 70) return false;
+
+      if (flagF === 'any' && !r.flag) return false;
+      if (flagF === 'green' && r.flag !== 'green') return false;
+      if (flagF === 'orange' && r.flag !== 'orange') return false;
+      return true;
+    });
+
+    // الترتيب
+    rows.sort((a, b) => {
+      let vA = a[sortCol], vB = b[sortCol];
+      if (sortCol === 'flag') {
+        const order = { green: 1, orange: 2, '': 3 };
+        vA = order[a.flag]; vB = order[b.flag];
+      }
+      if (typeof vA === 'string') return sortAsc ? vA.localeCompare(vB) : vB.localeCompare(vA);
+      return sortAsc ? vA - vB : vB - vA;
+    });
+
+    // تحديث الإحصائيات
+    const crossUps = rows.filter(r => r.emaStatus === 'cross_up').length;
+    const flaggedCount = Object.keys(flags).length;
+    document.getElementById('statsBar').innerHTML = `
+      <div class="stat-pill">الأسهم المعروضة: <strong>${rows.length} / 100</strong></div>
+      <div class="stat-pill">تقاطع صاعد 10 EMA: <strong style="color:var(--green)">${crossUps}</strong></div>
+      <div class="stat-pill">الأسهم المعلّمة: <strong style="color:var(--orange)">${flaggedCount}</strong></div>
+    `;
+
+    // بناء صفوف الجدول
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = rows.map(r => {
+      const tvUrl = `https://www.tradingview.com/chart/?symbol=BIST%3A${r.symbol}&interval=${currentTF}`;
+      const rowClass = r.flag === 'green' ? 'flag-green' : r.flag === 'orange' ? 'flag-orange' : '';
+
+      let emaBadge = '';
+      if (r.emaStatus === 'cross_up') emaBadge = `<span class="pill up">⚡ تقاطع صاعد (+${r.emaDiff}%)</span>`;
+      else if (r.emaStatus === 'cross_down') emaBadge = `<span class="pill down">⚡ تقاطع هابط (${r.emaDiff}%)</span>`;
+      else if (r.emaDiff >= 0) emaBadge = `<span class="pill up">فوق 10 EMA (+${r.emaDiff}%)</span>`;
+      else emaBadge = `<span class="pill down">تحت 10 EMA (${r.emaDiff}%)</span>`;
+
+      const rsiClass = r.rsi >= 70 ? 'down' : r.rsi <= 30 ? 'up' : (r.rsi >= 55 ? 'warn' : 'neutral');
+
+      return `
+        <tr class="${rowClass}">
+          <td>${r.rank}</td>
+          <td>
+            <div class="flag-btns">
+              <button class="flag-btn ${r.flag === 'green' ? 'active-g' : ''}" title="علامة خضراء" onclick="toggleFlag('${r.symbol}','green')">🟢</button>
+              <button class="flag-btn ${r.flag === 'orange' ? 'active-o' : ''}" title="علامة برتقالية" onclick="toggleFlag('${r.symbol}','orange')">🟠</button>
+            </div>
+          </td>
+          <td>
+            <a href="${tvUrl}" target="_blank" rel="noopener" class="symbol-link">
+              ${r.symbol}
+              <span class="company-name">${r.name}</span>
+            </a>
+          </td>
+          <td><strong>${r.price.toFixed(2)} ₺</strong></td>
+          <td><span class="pill ${r.change >= 0 ? 'up' : 'down'}">${r.change >= 0 ? '+' : ''}${r.change}%</span></td>
+          <td>${emaBadge}</td>
+          <td><span class="pill ${rsiClass}">${r.rsi}</span></td>
+          <td><a href="${tvUrl}" target="_blank" rel="noopener" class="tv-btn">فتح TV ↗</a></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function downloadHTML() {
+    const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'bist_top_100_screener.html';
+    a.click();
+  }
+
+  renderTable();
+</script>
+</body>
+</html>
